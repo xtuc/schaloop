@@ -1,6 +1,6 @@
 # schaloop
 
-> Approach for event-driven application.
+> Approach for event-driven Golang application.
 
 ## Design
 
