@@ -2,6 +2,7 @@ package schaloop
 
 import (
 	"errors"
+	"fmt"
 	"runtime"
 	"sync"
 	"time"
@@ -64,22 +65,18 @@ func (eventloop *EventLoop) QueueWork(name string, fn func()) {
 }
 
 func (eventloop *EventLoop) QueueWorkFromChannelWithError(name string, workChan chan interface{}, fn func(interface{}), errorHandler func(err error)) {
-	wrappedFn := func() {
 
-		go func() {
-			for {
-				data := <-workChan
+	go func() {
+		for {
+			data := <-workChan
 
-				eventloop.QueueWorkWithError(name, func() {
-					fn(data)
-				}, errorHandler)
+			eventloop.QueueWorkWithError(name, func() {
+				fn(data)
+			}, errorHandler)
 
-				runtime.Gosched()
-			}
-		}()
-	}
-
-	eventloop.QueueWorkWithError(name, wrappedFn, errorHandler)
+			runtime.Gosched()
+		}
+	}()
 }
 
 func (eventloop *EventLoop) QueueWorkFromChannel(name string, workChan chan interface{}, fn func(interface{})) {
@@ -129,6 +126,15 @@ func (eventloop *EventLoop) Stop() {
 
 func (eventloop *EventLoop) DumpMonitor() string {
 	return eventloop.monitor.Dump()
+}
+
+// Note that the receiver is not a pointer
+func (eventloop EventLoop) DumpStack() (str string) {
+	for k, work := range eventloop.queue {
+		str += fmt.Sprintf("[%d] fn: %p work: %p name: %s\n\r", k, eventloop.queue[k].fn, &eventloop.queue[k], work.name)
+	}
+
+	return str
 }
 
 func (eventloop *EventLoop) StartWithTimeout(timeout time.Duration) {
