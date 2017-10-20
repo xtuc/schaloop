@@ -35,8 +35,6 @@ func TestEventLoopEnsureOrder(t *testing.T) {
 	assert.Equal(t, order, []int{1, 2})
 }
 
-// FIXME(sven): order seems to be guarantee but not sequential?
-// Why it's only the case with channels?
 func TestEventLoopEnsureOrderChannel(t *testing.T) {
 	e := NewEventLoop()
 	e.StartWithTimeout(time.Duration(1 * time.Second))
@@ -47,7 +45,6 @@ func TestEventLoopEnsureOrderChannel(t *testing.T) {
 
 	chan1 := make(chan interface{})
 	chan2 := make(chan interface{})
-	chanStop := make(chan interface{})
 
 	e.QueueWorkFromChannel("test-chan1", chan1, func(data interface{}) {
 		<-time.After(10 * time.Millisecond)
@@ -56,19 +53,17 @@ func TestEventLoopEnsureOrderChannel(t *testing.T) {
 
 	e.QueueWorkFromChannel("test-chan2", chan2, func(data interface{}) {
 		order = append(order, 2)
-	})
 
-	e.QueueWorkFromChannel("stop", chanStop, func(data interface{}) {
-		waitChan <- false
+		if data == nil {
+			waitChan <- false
+		}
 	})
 
 	chan1 <- 1
 	chan2 <- 1
 
-	chan2 <- 1
 	chan1 <- 1
-
-	chanStop <- 1
+	chan2 <- nil
 
 	<-waitChan
 	e.Stop()

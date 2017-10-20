@@ -2,6 +2,7 @@ package schaloop
 
 import (
 	"errors"
+	"runtime"
 	"sync"
 	"time"
 
@@ -72,6 +73,8 @@ func (eventloop *EventLoop) QueueWorkFromChannelWithError(name string, workChan 
 				eventloop.QueueWorkWithError(name, func() {
 					fn(data)
 				}, errorHandler)
+
+				runtime.Gosched()
 			}
 		}()
 	}
