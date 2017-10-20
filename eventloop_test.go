@@ -1,4 +1,4 @@
-package eventloop
+package schaloop
 
 import (
 	"math/rand"
