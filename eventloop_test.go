@@ -82,6 +82,31 @@ func TestEventRegisterChannel(t *testing.T) {
 	e.Stop()
 }
 
+func TestEventRegisterChannelWithError(t *testing.T) {
+	e := NewEventLoop()
+	e.StartWithTimeout(time.Duration(1 * time.Second))
+
+	calledErrorHandler := false
+
+	waitChan := make(chan bool)
+	workChan := make(chan interface{})
+
+	e.QueueWorkFromChannelWithError("test-workChan", workChan, func(data interface{}) {
+		panic("foo")
+	}, func(err error) {
+		calledErrorHandler = true
+		assert.Equal(t, err.Error(), "foo")
+
+		waitChan <- false
+	})
+
+	workChan <- 1
+
+	<-waitChan
+	e.Stop()
+	assert.True(t, calledErrorHandler)
+}
+
 func TestEventLoopWriteConsistency(t *testing.T) {
 	rand.Seed(time.Now().Unix())
 
@@ -135,7 +160,6 @@ func TestEventLoopHandleTimeout(t *testing.T) {
 		assert.Equal(t, err, TIMEOUT_ERROR)
 
 		calledErrorHandler = true
-		// waitChan <- false
 	})
 
 	e.QueueWork("shutdown", func() {

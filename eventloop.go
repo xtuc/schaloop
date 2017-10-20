@@ -4,6 +4,8 @@ import (
 	"errors"
 	"sync"
 	"time"
+
+	"github.com/xtuc/schaloop/monitoring"
 )
 
 var (
@@ -37,9 +39,9 @@ func (work *work) abortWithError(err error) {
 type queue []work
 
 type EventLoop struct {
-	queue  queue
-	time   time.Time
-	ticker *time.Ticker
+	queue   queue
+	ticker  *time.Ticker
+	monitor *monitoring.Monitor
 
 	queueLock sync.Mutex
 }
@@ -47,7 +49,8 @@ type EventLoop struct {
 func NewEventLoop() *EventLoop {
 
 	return &EventLoop{
-		ticker: time.NewTicker(LOOP_FREQ),
+		ticker:  time.NewTicker(LOOP_FREQ),
+		monitor: monitoring.NewMonitor(),
 	}
 }
 
@@ -59,11 +62,7 @@ func (eventloop *EventLoop) QueueWork(name string, fn func()) {
 	eventloop.QueueWorkWithError(name, fn, errorHandler)
 }
 
-func (eventloop *EventLoop) QueueWorkFromChannel(name string, workChan chan interface{}, fn func(interface{})) {
-	errorHandler := func(err error) {
-		panic(err)
-	}
-
+func (eventloop *EventLoop) QueueWorkFromChannelWithError(name string, workChan chan interface{}, fn func(interface{}), errorHandler func(err error)) {
 	wrappedFn := func() {
 
 		go func() {
@@ -80,6 +79,14 @@ func (eventloop *EventLoop) QueueWorkFromChannel(name string, workChan chan inte
 	eventloop.QueueWorkWithError(name, wrappedFn, errorHandler)
 }
 
+func (eventloop *EventLoop) QueueWorkFromChannel(name string, workChan chan interface{}, fn func(interface{})) {
+	errorHandler := func(err error) {
+		panic(err)
+	}
+
+	eventloop.QueueWorkFromChannelWithError(name, workChan, fn, errorHandler)
+}
+
 func (eventloop *EventLoop) QueueWorkWithError(name string, fn func(), errorHandler func(err error)) {
 	work := work{
 		fn:           fn,
@@ -87,13 +94,15 @@ func (eventloop *EventLoop) QueueWorkWithError(name string, fn func(), errorHand
 		errorHandler: errorHandler,
 	}
 
+	eventloop.queueLock.Lock()
 	eventloop.enqueue(work)
+	eventloop.queueLock.Unlock()
 }
 
 func (eventloop *EventLoop) enqueue(work work) {
-	eventloop.queueLock.Lock()
 	eventloop.queue = append(queue{work}, eventloop.queue...)
-	eventloop.queueLock.Unlock()
+
+	go eventloop.monitor.AddWork()
 }
 
 func (eventloop *EventLoop) dequeueWork() work {
@@ -101,6 +110,8 @@ func (eventloop *EventLoop) dequeueWork() work {
 	work := queue[len(queue)-1]
 
 	eventloop.queue = queue[:len(queue)-1]
+
+	go eventloop.monitor.SubWork()
 
 	return work
 }
@@ -111,6 +122,10 @@ func (eventloop *EventLoop) hasWork() bool {
 
 func (eventloop *EventLoop) Stop() {
 	eventloop.ticker.Stop()
+}
+
+func (eventloop *EventLoop) DumpMonitor() string {
+	return eventloop.monitor.Dump()
 }
 
 func (eventloop *EventLoop) StartWithTimeout(timeout time.Duration) {
@@ -129,13 +144,15 @@ func (eventloop *EventLoop) StartWithTimeout(timeout time.Duration) {
 
 			// Block until next tick
 			<-eventloop.ticker.C
+			eventloop.monitor.Tick()
 
 			if currentWork != nil {
 				deadline := time.After(timeout)
-				eventloop.time = time.Now()
-
 				waitExecution := make(chan bool)
 
+				eventloop.monitor.ExecutionStart()
+
+				// Cancellable goroutine
 				go func() {
 					go func() {
 						defer func() {
@@ -158,7 +175,9 @@ func (eventloop *EventLoop) StartWithTimeout(timeout time.Duration) {
 					currentWork = nil
 					waitExecution <- false
 				}()
+
 				<-waitExecution
+				eventloop.monitor.ExecutionStop()
 			}
 		}
 
