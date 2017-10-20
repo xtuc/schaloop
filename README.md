@@ -4,7 +4,7 @@
 
 ## Design
 
-It uses stack of work (that you enqueue, see API) which is processed by a single Goroutine. That way we can ensure the memory safety of the program.
+It uses stack of work (that you enqueue, see API) which is processed by a single Goroutine. All writes are linearized, that way we can ensure the memory safety of the program.
 
 ### Experimentation: real thread
 
