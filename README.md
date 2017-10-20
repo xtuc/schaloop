@@ -6,7 +6,11 @@
 
 It uses stack of work (that you enqueue, see API) which is processed by a single Goroutine. All writes are linearized, that way we can ensure the memory safety of the program.
 
-### Experimentation: real thread
+### Work timeout
+
+To avoid stopping the loop for too long, schaloop provides a timeout mechanism. We are able to interrupt work using a `panic`. The error won't be propagated.
+
+### Not implemented: real thread
 
 The Goroutine impose some technical restrictions:
 - The work can not be resumed or aborted
