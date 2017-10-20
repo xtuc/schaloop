@@ -18,10 +18,10 @@ type work struct {
 	errorHandler func(error)
 }
 
-func (work *work) safeExecute(timeout time.Duration) {
+func (work *work) safeExecute() {
 	defer func() {
 		if r := recover(); r != nil {
-			work.errorHandler(errors.New(r.(string)))
+			go work.errorHandler(errors.New(r.(string)))
 		}
 	}()
 
@@ -117,8 +117,6 @@ func (eventloop *EventLoop) StartWithTimeout(timeout time.Duration) {
 
 	go func() {
 		for {
-			<-eventloop.ticker.C
-
 			var currentWork *work
 
 			eventloop.queueLock.Lock()
@@ -129,12 +127,38 @@ func (eventloop *EventLoop) StartWithTimeout(timeout time.Duration) {
 			}
 			eventloop.queueLock.Unlock()
 
+			// Block until next tick
+			<-eventloop.ticker.C
+
 			if currentWork != nil {
-
+				deadline := time.After(timeout)
 				eventloop.time = time.Now()
-				currentWork.safeExecute(timeout)
 
-				currentWork = nil
+				waitExecution := make(chan bool)
+
+				go func() {
+					go func() {
+						defer func() {
+							currentWorkRef := currentWork
+
+							if r := recover(); r != nil {
+								waitExecution <- false
+								go currentWorkRef.errorHandler(TIMEOUT_ERROR)
+							}
+						}()
+
+						<-deadline
+
+						if currentWork != nil {
+							panic(TIMEOUT_ERROR)
+						}
+					}()
+
+					currentWork.safeExecute()
+					currentWork = nil
+					waitExecution <- false
+				}()
+				<-waitExecution
 			}
 		}
 

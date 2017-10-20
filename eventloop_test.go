@@ -1,6 +1,8 @@
 package schaloop
 
 import (
+	"fmt"
+	"log"
 	"math/rand"
 	"strconv"
 	"testing"
@@ -18,6 +20,7 @@ func TestEventLoopEnsureOrder(t *testing.T) {
 	waitChan := make(chan bool)
 
 	e.QueueWork("1", func() {
+		<-time.After(10 * time.Millisecond)
 		order = append(order, 1)
 	})
 
@@ -113,4 +116,35 @@ func TestEventLoopWriteConsistency(t *testing.T) {
 	e.Stop()
 
 	assert.Equal(t, count, iterations)
+}
+
+func TestEventLoopHandleTimeout(t *testing.T) {
+	e := NewEventLoop()
+	e.StartWithTimeout(time.Duration(3 * time.Second))
+
+	calledErrorHandler := false
+	waitChan := make(chan bool)
+
+	e.QueueWorkWithError("1", func() {
+		for {
+			<-time.After(1 * time.Second)
+			fmt.Printf(".")
+		}
+	}, func(err error) {
+		fmt.Printf("\n")
+		assert.Equal(t, err, TIMEOUT_ERROR)
+
+		calledErrorHandler = true
+		// waitChan <- false
+	})
+
+	e.QueueWork("shutdown", func() {
+		log.Println("called")
+		waitChan <- false
+	})
+
+	<-waitChan
+	e.Stop()
+
+	assert.True(t, calledErrorHandler)
 }
