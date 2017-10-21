@@ -2,7 +2,6 @@ package schaloop
 
 import (
 	"fmt"
-	"log"
 	"math/rand"
 	"strconv"
 	"testing"
@@ -199,7 +198,6 @@ func TestEventLoopHandleTimeout(t *testing.T) {
 	})
 
 	e.QueueWork("shutdown", func() {
-		log.Println("called")
 		waitChan <- false
 	})
 

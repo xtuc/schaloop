@@ -64,7 +64,11 @@ func (eventloop *EventLoop) QueueWork(name string, fn func()) {
 	eventloop.QueueWorkWithError(name, fn, errorHandler)
 }
 
-func (eventloop *EventLoop) QueueWorkFromChannelWithError(name string, workChan chan interface{}, fn func(interface{}), errorHandler func(err error)) {
+func (eventloop *EventLoop) QueueWorkFromChannelWithError(name string, work interface{}, fn func(interface{}), errorHandler func(err error)) {
+	workChan, ok := work.(chan interface{})
+	if !ok {
+		panic("Work is not a chan")
+	}
 
 	go func() {
 		for {
@@ -79,7 +83,12 @@ func (eventloop *EventLoop) QueueWorkFromChannelWithError(name string, workChan 
 	}()
 }
 
-func (eventloop *EventLoop) QueueWorkFromChannel(name string, workChan chan interface{}, fn func(interface{})) {
+func (eventloop *EventLoop) QueueWorkFromChannel(name string, work interface{}, fn func(interface{})) {
+	workChan, ok := work.(chan interface{})
+	if !ok {
+		panic("Work is not a chan")
+	}
+
 	errorHandler := func(err error) {
 		panic(err)
 	}
