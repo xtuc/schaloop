@@ -167,12 +167,12 @@ func (eventloop *EventLoop) Stop() {
 	eventloop.ticker.Stop()
 }
 
-// Dumps the Monitoring inside the loop
+// Dumps the monitoring inside the loop
 func (eventloop *EventLoop) DumpMonitor() string {
 	return eventloop.monitor.Dump()
 }
 
-// Note that the receiver is not a pointer
+// Dumps the current execution stack of  the loop
 func (eventloop EventLoop) DumpStack() (str string) {
 	for k, work := range eventloop.queue {
 		str += fmt.Sprintf("[%d] fn: %p work: %p name: %s\n\r", k, eventloop.queue[k].fn, &eventloop.queue[k], work.name)
