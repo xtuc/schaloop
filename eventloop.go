@@ -49,8 +49,14 @@ type work struct {
 
 func (work *work) safeExecute() {
 	defer func() {
-		if r := recover(); r != nil {
-			go work.errorHandler(errors.New(r.(string)))
+		if err := recover(); err != nil {
+
+			if errString, isString := err.(string); isString {
+				go work.errorHandler(errors.New(errString))
+			} else {
+				fmt.Errorf("An error occurred: %s", err)
+				go work.errorHandler(errors.New("An error occurred"))
+			}
 		}
 	}()
 
