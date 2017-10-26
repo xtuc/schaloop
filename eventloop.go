@@ -52,10 +52,9 @@ func (work *work) safeExecute() {
 		if err := recover(); err != nil {
 
 			if errString, isString := err.(string); isString {
-				go work.errorHandler(errors.New(errString))
+				work.errorHandler(errors.New(errString))
 			} else {
-				fmt.Errorf("An error occurred: %s", err)
-				go work.errorHandler(errors.New("An error occurred"))
+				work.errorHandler(fmt.Errorf("An error occurred: %s", err))
 			}
 		}
 	}()
